@@ -1,0 +1,32 @@
+name: Amazon Price Monitor
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # Runs daily 9:30 AM IST
+  workflow_dispatch:
+
+jobs:
+  run-scraper:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        pip install pandas playwright requests
+        playwright install chromium
+
+    - name: Run scraper
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+      run: python scraper.py
