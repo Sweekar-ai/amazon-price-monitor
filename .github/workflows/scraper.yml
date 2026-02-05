@@ -2,16 +2,14 @@ name: Run scraper
 
 on:
   workflow_dispatch:
-
   schedule:
-    - cron: "*/5 * * * *"   # every 5 mins (test)
+    - cron: "*/5 * * * *"
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repo
         uses: actions/checkout@v4
 
