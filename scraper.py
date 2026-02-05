@@ -1,5 +1,4 @@
 from playwright.sync_api import sync_playwright
-import pandas as pd
 import requests
 import os
 
@@ -16,15 +15,12 @@ ASINS = [
 
 PINCODE = "110001"
 
-OUTPUT_FILE = "amazon_price_seller_report.xlsx"
-
-# Telegram credentials from GitHub Secrets
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 # ================= SCRAPER =================
 
-results = []
+results_text = []
 
 with sync_playwright() as p:
 
@@ -50,42 +46,34 @@ with sync_playwright() as p:
         # Price
         try:
             price = page.locator(".a-price-whole").first.text_content()
-            price = price.strip()
+            price = f"₹{price.strip()}"
         except:
-            price = "Not Available"
+            price = "Price NA"
 
         # Seller
         try:
             seller = page.locator("#sellerProfileTriggerId").first.text_content()
             seller = seller.strip()
         except:
-            seller = "Not Available"
+            seller = "Seller NA"
 
-        results.append({
-            "ASIN": asin,
-            "Pincode": PINCODE,
-            "Price": price,
-            "Seller": seller
-        })
+        line = f"{asin} — {price} — Seller: {seller}"
+        results_text.append(line)
 
     browser.close()
 
-# ================= SAVE =================
+# ================= TELEGRAM MESSAGE =================
 
-df = pd.DataFrame(results)
-df.to_excel(OUTPUT_FILE, index=False)
+message = "📦 Amazon ASIN Monitor\n\n" + "\n".join(results_text)
 
-print("Excel created")
+url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-# ================= TELEGRAM SEND =================
+requests.post(
+    url,
+    data={
+        "chat_id": CHAT_ID,
+        "text": message
+    }
+)
 
-url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
-
-with open(OUTPUT_FILE, "rb") as f:
-    requests.post(
-        url,
-        data={"chat_id": CHAT_ID},
-        files={"document": f}
-    )
-
-print("Report sent to Telegram")
+print("Telegram message sent")
