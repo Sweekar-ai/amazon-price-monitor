@@ -1,8 +1,7 @@
 from playwright.sync_api import sync_playwright
 import requests
 import os
-
-# ================= CONFIG =================
+import time
 
 ASINS = [
     "B0D9BHX9MZ",
@@ -18,28 +17,47 @@ PINCODE = "110001"
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# ================= SCRAPER =================
-
 results_text = []
+
+def open_pdp(page, asin):
+
+    url = f"https://www.amazon.in/dp/{asin}"
+
+    for attempt in range(3):
+
+        try:
+            page.goto(url, timeout=60000)
+            page.wait_for_load_state("domcontentloaded")
+
+            page.wait_for_selector("#productTitle", timeout=60000)
+            return True
+
+        except:
+            print(f"Retry {attempt+1} for {asin}")
+            time.sleep(5)
+
+    return False
 
 with sync_playwright() as p:
 
     browser = p.chromium.launch(headless=True)
-    page = browser.new_context(locale="en-IN").new_page()
+    context = browser.new_context(locale="en-IN")
+    page = context.new_page()
 
     for asin in ASINS:
 
         print(f"Processing {asin}")
 
-        page.goto(f"https://www.amazon.in/dp/{asin}")
-        page.wait_for_selector("#productTitle")
+        if not open_pdp(page, asin):
+            results_text.append(f"{asin} — PDP Failed")
+            continue
 
         # Apply pincode
         try:
             page.locator("#contextualIngressPtLabel").click()
             page.locator("#GLUXZipUpdateInput").fill(PINCODE)
             page.locator("#GLUXZipUpdate").click()
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(4000)
         except:
             pass
 
@@ -57,23 +75,14 @@ with sync_playwright() as p:
         except:
             seller = "Seller NA"
 
-        line = f"{asin} — {price} — Seller: {seller}"
-        results_text.append(line)
+        results_text.append(f"{asin} — {price} — Seller: {seller}")
 
     browser.close()
-
-# ================= TELEGRAM MESSAGE =================
 
 message = "📦 Amazon ASIN Monitor\n\n" + "\n".join(results_text)
 
 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-requests.post(
-    url,
-    data={
-        "chat_id": CHAT_ID,
-        "text": message
-    }
-)
+requests.post(url, data={"chat_id": CHAT_ID, "text": message})
 
 print("Telegram message sent")
