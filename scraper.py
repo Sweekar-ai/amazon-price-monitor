@@ -2,6 +2,9 @@ from playwright.sync_api import sync_playwright
 import requests
 import os
 import time
+from datetime import datetime
+
+# ================= CONFIG =================
 
 ASINS = [
     "B0D9BHX9MZ",
@@ -17,7 +20,31 @@ PINCODE = "110001"
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-results_text = []
+# ================= TELEGRAM FUNCTION =================
+
+def send_telegram_message(results):
+
+    now = datetime.now().strftime("%d %b %H:%M")
+
+    text = f"📦 Amazon ASIN Monitor ({now})\n\n"
+
+    if len(results) == 0:
+        text += "⚠️ No data scraped.\nAmazon may have blocked the request."
+    else:
+        for r in results:
+            text += f"{r['ASIN']} → {r['Seller']} | ₹{r['Price']}\n"
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    response = requests.post(url, data={
+        "chat_id": CHAT_ID,
+        "text": text
+    })
+
+    print("Telegram Status:", response.status_code)
+    print("Telegram Response:", response.text)
+
+# ================= PDP OPEN FUNCTION =================
 
 def open_pdp(page, asin):
 
@@ -26,17 +53,23 @@ def open_pdp(page, asin):
     for attempt in range(3):
 
         try:
-            page.goto(url, timeout=60000)
-            page.wait_for_load_state("domcontentloaded")
+            print(f"Opening {asin} (Attempt {attempt+1})")
 
+            page.goto(url, timeout=120000)
+            page.wait_for_load_state("domcontentloaded")
             page.wait_for_selector("#productTitle", timeout=60000)
+
             return True
 
         except:
-            print(f"Retry {attempt+1} for {asin}")
+            print(f"PDP load failed for {asin}")
             time.sleep(5)
 
     return False
+
+# ================= SCRAPER =================
+
+results = []
 
 with sync_playwright() as p:
 
@@ -46,10 +79,15 @@ with sync_playwright() as p:
 
     for asin in ASINS:
 
-        print(f"Processing {asin}")
+        print(f"\nProcessing ASIN: {asin}")
 
         if not open_pdp(page, asin):
-            results_text.append(f"{asin} — PDP Failed")
+
+            results.append({
+                "ASIN": asin,
+                "Seller": "PDP Failed",
+                "Price": "NA"
+            })
             continue
 
         # Apply pincode
@@ -59,30 +97,35 @@ with sync_playwright() as p:
             page.locator("#GLUXZipUpdate").click()
             page.wait_for_timeout(4000)
         except:
-            pass
+            print("Pincode apply skipped")
 
-        # Price
+        # Extract price
         try:
             price = page.locator(".a-price-whole").first.text_content()
-            price = f"₹{price.strip()}"
+            price = price.strip()
         except:
-            price = "Price NA"
+            price = "NA"
 
-        # Seller
+        # Extract seller
         try:
             seller = page.locator("#sellerProfileTriggerId").first.text_content()
             seller = seller.strip()
         except:
-            seller = "Seller NA"
+            seller = "NA"
 
-        results_text.append(f"{asin} — {price} — Seller: {seller}")
+        print(f"Seller: {seller}")
+        print(f"Price: ₹{price}")
+
+        results.append({
+            "ASIN": asin,
+            "Seller": seller,
+            "Price": price
+        })
 
     browser.close()
 
-message = "📦 Amazon ASIN Monitor\n\n" + "\n".join(results_text)
+# ================= SEND TELEGRAM =================
 
-url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+send_telegram_message(results)
 
-requests.post(url, data={"chat_id": CHAT_ID, "text": message})
-
-print("Telegram message sent")
+print("\nMonitor run completed")
