@@ -3,7 +3,7 @@ name: Run scraper
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/5 * * * *"   # every 5 mins (edit if needed)
 
 jobs:
   run:
@@ -24,5 +24,7 @@ jobs:
           playwright install chromium
 
       - name: Run scraper
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python scraper.py
-        
