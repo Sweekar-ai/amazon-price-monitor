@@ -7,15 +7,14 @@ from datetime import datetime
 # ================= CONFIG =================
 
 ASINS = [
-    "B0D9BHX9MZ",
-    "B0D9BPK1NV",
-    "B0BX46DVXZ",
-    "B0F99GWXLL",
     "B0D9BLY9J9",
-    "B0F99HW555"
+    "B0F99HW555",
+    "B0D9BRS5WX",
+    "B0BX484K3Y",
+    "B0FSLDJQRV"
 ]
 
-PINCODE = "110001"
+PINCODE = "122008"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -34,7 +33,7 @@ def send_telegram_message(results):
         print("Telegram secrets missing")
         return
 
-    text = "📦 Amazon ASIN Monitor\n\n"
+    text = "🛡️❌ Wellcore ASINs Radar\n\n"
 
     for r in results:
         text += f"{r['ASIN']} → {r['Seller']} | ₹{r['Price']}\n"
