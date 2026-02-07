@@ -3,7 +3,7 @@ name: Run scraper
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"   # every 5 mins (edit if needed)
+    - cron: "*/59 * * * *"   # every 5 mins (edit if needed)
 
 jobs:
   run:
