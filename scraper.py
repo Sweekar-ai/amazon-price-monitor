@@ -24,25 +24,33 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 def send_telegram_message(results):
 
-    now = datetime.now().strftime("%d %b %H:%M")
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    CHAT_ID = os.getenv("CHAT_ID")
 
-    text = f"📦 Amazon ASIN Monitor ({now})\n\n"
+    print("Loaded BOT TOKEN:", BOT_TOKEN)
+    print("Loaded CHAT ID:", CHAT_ID)
 
-    if len(results) == 0:
-        text += "⚠️ No data scraped.\nAmazon may have blocked the request."
-    else:
-        for r in results:
-            text += f"{r['ASIN']} → {r['Seller']} | ₹{r['Price']}\n"
+    if not BOT_TOKEN or not CHAT_ID:
+        print("Telegram secrets missing")
+        return
+
+    text = "📦 Amazon ASIN Monitor\n\n"
+
+    for r in results:
+        text += f"{r['ASIN']} → {r['Seller']} | ₹{r['Price']}\n"
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    response = requests.post(url, data={
+    payload = {
         "chat_id": CHAT_ID,
         "text": text
-    })
+    }
+
+    response = requests.post(url, data=payload)
 
     print("Telegram Status:", response.status_code)
     print("Telegram Response:", response.text)
+
 
 # ================= PDP OPEN FUNCTION =================
 
