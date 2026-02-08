@@ -14,7 +14,7 @@ ASINS = [
     "B0FSLDJQRV"
 ]
 
-# 🔹 HARD-CODED PRODUCT NAMES (NEW ADDITION ONLY)
+# 🔹 HARD-CODED PRODUCT NAMES
 
 ASIN_PRODUCT_MAP = {
     "B0BX484K3Y": "Creatine Unflavoured (250g)",
@@ -47,10 +47,14 @@ def send_telegram_message(results):
 
     for r in results:
 
-        # 🔹 Map product name
         product_name = ASIN_PRODUCT_MAP.get(r["ASIN"], "Unknown Product")
 
-        text += f"{product_name} → {r['Seller']} | ₹{r['Price']}\n"
+        text += (
+            f"📦 {product_name}\n"
+            f"🔎 {r['ASIN']}\n"
+            f"👤 {r['Seller']}\n"
+            f"💰 ₹{r['Price']}\n\n"
+        )
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
