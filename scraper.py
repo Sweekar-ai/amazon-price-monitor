@@ -2,53 +2,77 @@ from playwright.sync_api import sync_playwright
 import requests
 import os
 import time
+from datetime import datetime
 
 # ================= CONFIG =================
 
 ASINS = [
-    "B0BX484K3Y",
-    "B0D9BRS5WX",
-    "B0F99HW555",
     "B0D9BLY9J9",
+    "B0F99HW555",
+    "B0D9BRS5WX",
+    "B0BX484K3Y",
     "B0FSLDJQRV"
 ]
 
-PINCODE = "110001"
-
-# Hard-coded Product Names
-ASIN_PRODUCT_MAP = {
-    "B0BX484K3Y": "Creatine Unflavoured (250g)",
-    "B0D9BRS5WX": "Creatine Fruit Fusion (307g)",
-    "B0F99HW555": "Creatine Kiwi Kick (307g)",
-    "B0D9BLY9J9": "Creatine Tropical Tango (307g)",
-    "B0FSLDJQRV": "Creatine Watermelon Wave (307g)"
-}
-
-OWN_SELLER = "Wellversed Health"
+PINCODE = "122008"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# ================= TELEGRAM =================
+# ================= TELEGRAM FUNCTION =================
 
-def send_telegram(message):
+def send_telegram_message(results):
+
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    CHAT_ID = os.getenv("CHAT_ID")
+
+    print("Loaded BOT TOKEN:", BOT_TOKEN)
+    print("Loaded CHAT ID:", CHAT_ID)
 
     if not BOT_TOKEN or not CHAT_ID:
         print("Telegram secrets missing")
         return
 
+    text = "🛡️❌ Wellcore ASINs Radar\n\n"
+
+    for r in results:
+        text += f"{r['ASIN']} → {r['Seller']} | ₹{r['Price']}\n"
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     payload = {
         "chat_id": CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML"
+        "text": text
     }
 
-    res = requests.post(url, data=payload)
+    response = requests.post(url, data=payload)
 
-    print("Telegram Status:", res.status_code)
-    print("Telegram Response:", res.text)
+    print("Telegram Status:", response.status_code)
+    print("Telegram Response:", response.text)
+
+
+# ================= PDP OPEN FUNCTION =================
+
+def open_pdp(page, asin):
+
+    url = f"https://www.amazon.in/dp/{asin}"
+
+    for attempt in range(3):
+
+        try:
+            print(f"Opening {asin} (Attempt {attempt+1})")
+
+            page.goto(url, timeout=120000)
+            page.wait_for_load_state("domcontentloaded")
+            page.wait_for_selector("#productTitle", timeout=60000)
+
+            return True
+
+        except:
+            print(f"PDP load failed for {asin}")
+            time.sleep(5)
+
+    return False
 
 # ================= SCRAPER =================
 
@@ -56,81 +80,59 @@ results = []
 
 with sync_playwright() as p:
 
-    browser = p.chromium.launch(
-        headless=True,
-        args=["--no-sandbox", "--disable-dev-shm-usage"]
-    )
-
+    browser = p.chromium.launch(headless=True)
     context = browser.new_context(locale="en-IN")
     page = context.new_page()
 
     for asin in ASINS:
 
-        print(f"Processing ASIN: {asin}")
+        print(f"\nProcessing ASIN: {asin}")
 
-        url = f"https://www.amazon.in/dp/{asin}"
-        page.goto(url, timeout=60000)
+        if not open_pdp(page, asin):
 
-        # Wait PDP
-        try:
-            page.wait_for_selector("#productTitle", timeout=30000)
-        except:
-            results.append((asin, "PDP Failed", "₹NA"))
+            results.append({
+                "ASIN": asin,
+                "Seller": "PDP Failed",
+                "Price": "NA"
+            })
             continue
 
         # Apply pincode
         try:
             page.locator("#contextualIngressPtLabel").click()
-            page.wait_for_selector("#GLUXZipUpdateInput")
-            page.fill("#GLUXZipUpdateInput", PINCODE)
-            page.click("#GLUXZipUpdate")
-            page.wait_for_timeout(3000)
+            page.locator("#GLUXZipUpdateInput").fill(PINCODE)
+            page.locator("#GLUXZipUpdate").click()
+            page.wait_for_timeout(4000)
         except:
-            pass
+            print("Pincode apply skipped")
 
-        # Seller
+        # Extract price
         try:
-            seller = page.locator("#sellerProfileTriggerId").inner_text()
+            price = page.locator(".a-price-whole").first.text_content()
+            price = price.strip()
         except:
-            seller = "Unknown"
+            price = "NA"
 
-        # Price
+        # Extract seller
         try:
-            price = page.locator(".a-price-whole").first.inner_text()
-            price = f"₹{price}"
+            seller = page.locator("#sellerProfileTriggerId").first.text_content()
+            seller = seller.strip()
         except:
-            price = "₹NA"
+            seller = "NA"
 
-        results.append((asin, seller, price))
+        print(f"Seller: {seller}")
+        print(f"Price: ₹{price}")
+
+        results.append({
+            "ASIN": asin,
+            "Seller": seller,
+            "Price": price
+        })
 
     browser.close()
 
-# ================= MESSAGE BUILDER =================
+# ================= SEND TELEGRAM =================
 
-message = "🛡️ <b>HaukX Surveillance Alert</b>\n"
-message += "━━━━━━━━━━━━━━━━━━━\n\n"
+send_telegram_message(results)
 
-for asin, seller, price in results:
-
-    product_name = ASIN_PRODUCT_MAP.get(asin, "Unknown Product")
-
-    # Hijacker highlight
-    seller_display = seller
-    if seller != OWN_SELLER and seller != "Unknown":
-        seller_display = f"🚨 {seller}"
-
-    message += (
-        f"📦 <b>{product_name}</b>\n"
-        f"🔎 {asin}\n"
-        f"👤 {seller_display}\n"
-        f"💰 {price}\n"
-        "━━━━━━━━━━━━━━━━━━━\n"
-    )
-
-message += "\n⏱ Auto-monitored via HaukX Engine"
-
-# ================= SEND =================
-
-send_telegram(message)
-
-print("Monitor run completed")
+print("\nMonitor run completed")
