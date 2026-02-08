@@ -14,6 +14,16 @@ ASINS = [
     "B0FSLDJQRV"
 ]
 
+# 🔹 HARD-CODED PRODUCT NAMES (NEW ADDITION ONLY)
+
+ASIN_PRODUCT_MAP = {
+    "B0BX484K3Y": "Creatine Unflavoured (250g)",
+    "B0D9BRS5WX": "Creatine Fruit Fusion (307g)",
+    "B0F99HW555": "Creatine Kiwi Kick (307g)",
+    "B0D9BLY9J9": "Creatine Tropical Tango (307g)",
+    "B0FSLDJQRV": "Creatine Watermelon Wave (307g)"
+}
+
 PINCODE = "122008"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -36,7 +46,11 @@ def send_telegram_message(results):
     text = "🛡️❌ Wellcore ASINs Radar\n\n"
 
     for r in results:
-        text += f"{r['ASIN']} → {r['Seller']} | ₹{r['Price']}\n"
+
+        # 🔹 Map product name
+        product_name = ASIN_PRODUCT_MAP.get(r["ASIN"], "Unknown Product")
+
+        text += f"{product_name} → {r['Seller']} | ₹{r['Price']}\n"
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
@@ -73,6 +87,7 @@ def open_pdp(page, asin):
             time.sleep(5)
 
     return False
+
 
 # ================= SCRAPER =================
 
@@ -130,6 +145,7 @@ with sync_playwright() as p:
         })
 
     browser.close()
+
 
 # ================= SEND TELEGRAM =================
 
